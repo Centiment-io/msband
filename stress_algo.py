@@ -28,6 +28,12 @@ from sklearn.discriminant_analysis import QuadraticDiscriminantAnalysis
 from sklearn.learning_curve import learning_curve, validation_curve
 from sklearn.grid_search import GridSearchCV
 from sklearn.metrics import roc_auc_score
+from sklearn.cross_validation import StratifiedKFold
+from sklearn.metrics import roc_curve, auc
+from sklearn.cross_validation import train_test_split
+from sklearn.preprocessing import label_binarize
+from sklearn.multiclass import OneVsRestClassifier
+from scipy import interp
 
 # Globals
 url = 'http://159.203.4.252/api/measurement?results_per_page=100'
@@ -59,6 +65,86 @@ def plot_validation_curve(param_name, param_range, train_scores, test_scores):
                  test_scores_mean + test_scores_std, alpha=0.2, color="g")
     plt.legend(loc="best")
     plt.savefig('vc_{}.png'.format(param_name))
+
+def plot_roc_curve(X, y, clf, name):
+
+    y = label_binarize(y, classes=[0, 1, 2])
+    n_classes = y.shape[1]
+
+    n_samples, n_features = X.shape
+
+    # shuffle and split training and test sets
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=.2, random_state=42)
+
+    # Learn to predict each class against the other
+    classifier = OneVsRestClassifier(clf)
+    y_score = classifier.fit(X_train, y_train).predict_proba(X_test)
+
+    # Compute ROC curve and ROC area for each class
+    fpr = dict()
+    tpr = dict()
+    roc_auc = dict()
+
+    for i in range(n_classes):
+        fpr[i], tpr[i], _ = roc_curve(y_test[:, i], y_score[:, i])
+        roc_auc[i] = auc(fpr[i], tpr[i])
+
+        start = time.clock()
+        auc_val = cross_val_score(clf, X_train, y_train[:, i], cv=10, scoring='roc_auc').mean()
+        end = time.clock()
+
+        logging.info('----Elapsed Time: {}---'.format(end-start))
+        logging.info('Cross Validation ROC AUC Score of Class {2} {0} = {1}'.format(name, auc_val, i))
+
+    # Compute micro-average ROC curve and ROC area
+    fpr["micro"], tpr["micro"], _ = roc_curve(y_test.ravel(), y_score.ravel())
+    roc_auc["micro"] = auc(fpr["micro"], tpr["micro"])
+
+    ##############################################################################
+    # Plot ROC curves for the multiclass problem
+
+    # Compute macro-average ROC curve and ROC area
+
+    # First aggregate all false positive rates
+    all_fpr = np.unique(np.concatenate([fpr[i] for i in range(n_classes)]))
+
+    # Then interpolate all ROC curves at this points
+    mean_tpr = np.zeros_like(all_fpr)
+    for i in range(n_classes):
+        mean_tpr += interp(all_fpr, fpr[i], tpr[i])
+
+    # Finally average it and compute AUC
+    mean_tpr /= n_classes
+
+    fpr["macro"] = all_fpr
+    tpr["macro"] = mean_tpr
+    roc_auc["macro"] = auc(fpr["macro"], tpr["macro"])
+
+    # Plot all ROC curves
+    plt.figure()
+    plt.plot(fpr["micro"], tpr["micro"],
+             label='micro-average ROC curve (area = {0:0.2f})'
+                   ''.format(roc_auc["micro"]),
+             linewidth=2)
+
+    plt.plot(fpr["macro"], tpr["macro"],
+             label='macro-average ROC curve (area = {0:0.2f})'
+                   ''.format(roc_auc["macro"]),
+             linewidth=2)
+
+    for i in range(n_classes):
+        plt.plot(fpr[i], tpr[i], label='ROC curve of class {0} (area = {1:0.2f})'
+                                       ''.format(i, roc_auc[i]))
+
+    plt.plot([0, 1], [0, 1], 'k--')
+    plt.xlim([0.0, 1.0])
+    plt.ylim([0.0, 1.05])
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    plt.title('Some extension of Receiver operating characteristic to multi-class')
+    plt.legend(loc="lower right")
+    plt.savefig('roc_curves_{}.png'.format(name))
+
 
 def plot_learning_curve(estimator, title, X, y, ylim=None, cv=None,
                         n_jobs=1, train_sizes=np.linspace(.1, 1.0, 5)):
@@ -229,7 +315,7 @@ def process_data(userid):
     df['state'] = le.transform(df['state'])
 
     # Setting the dimensionality of our data set
-    X_raw = df[['hr','gsr']].values
+    X_raw = df[['hr','gsr','temp','accx','accy','accz']].values
     T_raw = df[['state']].values
     T_raw = np.ravel(T_raw)
 
@@ -247,8 +333,8 @@ def process_data(userid):
 
     classifiers = [
         KNeighborsClassifier(3),
-        SVC(kernel="linear", C=0.025),
-        SVC(C=15, gamma=15),
+        SVC(kernel="linear", C=0.025, probability=True),
+        SVC(C=15, gamma=15, probability=True),
         DecisionTreeClassifier(max_depth=5),
         RandomForestClassifier(max_depth=5, n_estimators=10, max_features=1),
         AdaBoostClassifier(),
@@ -259,30 +345,10 @@ def process_data(userid):
     #Iterate through Classifiers
     for name, clf in zip(names, classifiers):
         # Compute Cross-Validation Score using K-Folds
-        start = time.clock()
-        scores = cross_val_score(clf, X, T, cv=10, scoring='roc_auc')
-        end = time.clock()
-        logging.info('----Elapsed Time: {}---'.format(end-start))
+        logging.info('----Currently processing: {}---'.format(name))
 
-         = clf.fit(X, T)
-
-        roc_auc_score(
-        train_scores = current.roc_auc_score(X, T)
-        test_scores = current.roc_auc_score(X_test, y_test)
-
-        # Log Results
-        logging.info('Training ROC AUC Score of {0} = {1}'.format(name, np.mean(train_scores)))
-        logging.info('Cross Validation ROC AUC Score of {0} = {1}'.format(name, np.mean(scores)))
-        logging.info('Test ROC AUC Score of {0} = {1}'.format(name, np.mean(test_scores)))
-
-    # Plot of hyperparameters and mean classification rate to determine B-V
-    train_scores, validation_scores = validation_curve(SVC(), X, T, param_name="gamma", param_range=gammas,
-                    cv=10, scoring="accuracy", n_jobs=1)
-    plot_validation_curve('Gamma', gammas, train_scores, validation_scores)
-    train_scores, validation_scores = validation_curve(SVC(), X, T, param_name="C", param_range=Cs,
-                    cv=10, scoring="accuracy", n_jobs=1)
-    plot_validation_curve('C', Cs, train_scores, validation_scores)
-
+        # Test
+        plot_roc_curve(X_raw, T_raw, clf, name)
 
     return
 
