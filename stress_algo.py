@@ -27,6 +27,7 @@ from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 from sklearn.discriminant_analysis import QuadraticDiscriminantAnalysis
 from sklearn.learning_curve import learning_curve, validation_curve
 from sklearn.grid_search import GridSearchCV
+from sklearn.metrics import roc_auc_score
 
 # Globals
 url = 'http://159.203.4.252/api/measurement?results_per_page=100'
@@ -130,20 +131,20 @@ def data_visualize(df):
 
     logging.info('Performing Data Visualization')
 
-    normal = df[df['state'] == 'normal']
-    calm = df[df['state'] == 'calm']
-    stressed = df[df['state'] == 'stressed']
+    normal = df[df['state'] == 'Normal']
+    calm = df[df['state'] == 'Calm']
+    stressed = df[df['state'] == 'Stressed']
 
     logging.info('The size of our dataset for the normal state {}'.format(normal.shape))
     logging.info('The size of our dataset for the calm state {}'.format(calm.shape))
     logging.info('The size of our dataset for the stressed state {}'.format(stressed.shape))
 
-    ax = normal.plot(kind='scatter', xlim = (30,140), ylim = (0,2000), x='hr', y='gsr',
+    ax = normal.plot(kind='scatter', xlim = (30,100), ylim = (0,15000), x='hr', y='gsr',
                                     color='DarkBlue', label='Normal')
-    calm.plot(kind='scatter', xlim = (30,140), ylim = (0,2000),x='hr', y='gsr',
+    calm.plot(kind='scatter', xlim = (30,100), ylim = (0,15000),x='hr', y='gsr',
                                     color='DarkGreen', label='Calm', ax=ax)
-    stressed.plot(kind='scatter', xlim = (30,140), ylim = (0,2000),x='hr', y='gsr',
-                                    color='DarkRed', label='Stressed', ax=ax)
+    #stressed.plot(kind='scatter', xlim = (30,100), ylim = (0,15000),x='hr', y='gsr',
+    #                                color='DarkRed', label='Stressed', ax=ax)
     plt.savefig('output.png')
 
 def retrieve_data():
@@ -170,6 +171,37 @@ def retrieve_data():
         df = pd.concat([df, new_df])
     return df
 
+def time_data(df):
+
+    logging.info('Performing Data Visualization')
+
+    normal = df[df['state'] == 'Normal']
+    normal1 = normal[normal['id'] < 4506]
+    normal2 = normal1[normal1['id'] > 3937]
+    normal2['timestamp'] = pd.to_datetime(normal2['timestamp'])
+
+    #calm = df[df['state'] == 'Calm']
+    #stressed = df[df['state'] == 'Stressed']
+
+    #logging.info('The size of our dataset for the normal state {}'.format(normal.shape))
+    #logging.info('The size of our dataset for the calm state {}'.format(calm.shape))
+    #logging.info('The size of our dataset for the stressed state {}'.format(stressed.shape))
+
+    print normal1
+    ax = normal2.plot(ylim = (30,100), x='timestamp', y='hr',
+                                    color='DarkBlue', label='Normal')
+    #calm.plot(kind='scatter', xlim = (30,100), ylim = (0,15000),x='hr', y='gsr',
+    #                                color='DarkGreen', label='Calm', ax=ax)
+    #stressed.plot(kind='scatter', xlim = (30,100), ylim = (0,15000),x='hr', y='gsr',
+    #                                color='DarkRed', label='Stressed', ax=ax)
+    plt.savefig('normalhrs.png')
+
+    fig2 = plt.figure()
+    ax1 = normal2.plot(x='timestamp', y='temp',
+                                    color='DarkRed', label='Normal')
+    plt.savefig('normaltemp.png')
+
+
 def process_data(userid):
     """ Method to process data using ML algorithms from the Scikit-Learn Python
     Library.
@@ -184,29 +216,31 @@ def process_data(userid):
     """
     logging.info('Processing Data')
 
-    # Retrive Data & Visualize
+    # Retrive Data from db & Visualize
     df = retrieve_data()
     data_visualize(df)
 
     # State of 'None' is our unlabeled data set, so exclude
     df = df[df['state'] != 'None']
 
-    # Preprocessing of our Data
-    # Map string 'states' to numeric labels
+    # Data Preprocessing: Map string 'states' to numeric labels
     le = preprocessing.LabelEncoder()
     le.fit(df['state'])
     df['state'] = le.transform(df['state'])
 
+    # Setting the dimensionality of our data set
     X_raw = df[['hr','gsr']].values
     T_raw = df[['state']].values
     T_raw = np.ravel(T_raw)
 
-    #X = StandardScaler().fit_transform(X)
-    X_raw = RobustScaler().fit_transform(X_raw)
+    # Further Preprocessing
+    X_raw = StandardScaler().fit_transform(X_raw)
     # X = preprocessing.normalize(X)
 
+    # Creating a training/test split 80-20
     X, X_test, T, y_test = train_test_split(X_raw, T_raw, test_size=0.20, random_state=42)
 
+    # Set of Classifiers
     names = ["Nearest Neighbors", "Linear SVM", "RBF SVM", "Decision Tree",
          "Random Forest", "AdaBoost", "Naive Bayes", "Linear Discriminant Analysis",
          "Quadratic Discriminant Analysis"]
@@ -222,30 +256,24 @@ def process_data(userid):
         LinearDiscriminantAnalysis(),
         QuadraticDiscriminantAnalysis()]
 
+    #Iterate through Classifiers
     for name, clf in zip(names, classifiers):
         # Compute Cross-Validation Score using K-Folds
         start = time.clock()
-        scores = cross_val_score(clf, X, T, cv=10, scoring='accuracy')
+        scores = cross_val_score(clf, X, T, cv=10, scoring='roc_auc')
         end = time.clock()
         logging.info('----Elapsed Time: {}---'.format(end-start))
 
-        current = clf.fit(X, T)
-        train_scores = current.score(X, T)
-        test_scores = current.score(X_test, y_test)
-        logging.info('Training Mean Classification Accuracy of {0} = {1}'.format(name, np.mean(train_scores)))
-        logging.info('Cross Validation Mean Classification Accuracy of {0} = {1}'.format(name, np.mean(scores)))
-        logging.info('Test Mean Classification Accuracy of {0} = {1}'.format(name, np.mean(test_scores)))
+         = clf.fit(X, T)
 
+        roc_auc_score(
+        train_scores = current.roc_auc_score(X, T)
+        test_scores = current.roc_auc_score(X_test, y_test)
 
-
-    # Grid Search for optimal hyperparameters for SVM RBF
-    Cs = np.logspace(-3, 4, 6)
-    gammas = np.logspace(-3, 4, 6)
-    param_grid = {'C': Cs, 'gamma':gammas}
-    grid = GridSearchCV(SVC(), param_grid=param_grid, cv=10)
-    grid.fit(X, T)
-
-    print("The best parameters are {0}s with a score of {1}".format(grid.best_params_, grid.best_score_))
+        # Log Results
+        logging.info('Training ROC AUC Score of {0} = {1}'.format(name, np.mean(train_scores)))
+        logging.info('Cross Validation ROC AUC Score of {0} = {1}'.format(name, np.mean(scores)))
+        logging.info('Test ROC AUC Score of {0} = {1}'.format(name, np.mean(test_scores)))
 
     # Plot of hyperparameters and mean classification rate to determine B-V
     train_scores, validation_scores = validation_curve(SVC(), X, T, param_name="gamma", param_range=gammas,
@@ -255,20 +283,7 @@ def process_data(userid):
                     cv=10, scoring="accuracy", n_jobs=1)
     plot_validation_curve('C', Cs, train_scores, validation_scores)
 
-    # Plot Learning Curves for training/validation sets
-    print X.shape
-    print T.shape
-    plot_learning_curve(SVC(), 'Learning Curves', X, T, cv=10)
 
-    # Plot the results using optimal hyperparameters
-    best = SVC(gamma=grid.best_params_['gamma'], C=grid.best_params_['C']).fit(X, T)
-    print best.score(X_test, y_test)
-
-    # TODO:Classify unseen data into one of the states and quantify level
-    # Set a PATCH/POST request to update stress level values
-    # payload = {'username': 'bob', 'email': 'bob@bob.com'}
-    # r = requests.put("http://somedomain.org/endpoint", data=payload)
-    # r = requests.post('http://httpbin.org/post', json={"key": "value"})
     return
 
 if __name__ == "__main__":
