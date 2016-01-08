@@ -7,6 +7,7 @@ Joseph Chu - Dec/11
 import requests
 import logging
 import time
+import csv
 
 # ML Imports
 import numpy as np
@@ -68,7 +69,9 @@ def plot_validation_curve(param_name, param_range, train_scores, test_scores):
 
 def plot_roc_curve(X, y, clf, name):
 
+    print y
     y = label_binarize(y, classes=[0, 1, 2])
+    print y
     n_classes = y.shape[1]
 
     n_samples, n_features = X.shape
@@ -132,19 +135,27 @@ def plot_roc_curve(X, y, clf, name):
                    ''.format(roc_auc["macro"]),
              linewidth=2)
 
-    for i in range(n_classes):
-        plt.plot(fpr[i], tpr[i], label='ROC curve of class {0} (area = {1:0.2f})'
-                                       ''.format(i, roc_auc[i]))
+    with open('{}_features.csv'.format(n_features), 'a') as csvfile:
+        writer = csv.writer(csvfile, delimiter =",",quoting=csv.QUOTE_MINIMAL)
 
-    plt.plot([0, 1], [0, 1], 'k--')
-    plt.xlim([0.0, 1.0])
-    plt.ylim([0.0, 1.05])
-    plt.xlabel('False Positive Rate')
-    plt.ylabel('True Positive Rate')
-    plt.title('Some extension of Receiver operating characteristic to multi-class')
-    plt.legend(loc="lower right")
-    plt.savefig('roc_curves_{}.png'.format(name))
+        cur_row = []
+        cur_row.append(name)
+        cur_row.append(str(end-start))
+        for i in range(n_classes):
+            cur_row.append('{:0.2f}'.format(roc_auc[i]))
+            plt.plot(fpr[i], tpr[i], label='ROC curve of class {0} (area = {1:0.2f})'
+                                           ''.format(i, roc_auc[i]))
+        plt.plot([0, 1], [0, 1], 'k--')
+        plt.xlim([0.0, 1.0])
+        plt.ylim([0.0, 1.05])
+        plt.xlabel('False Positive Rate')
+        plt.ylabel('True Positive Rate')
+        plt.title('Some extension of Receiver operating characteristic to multi-class')
+        plt.legend(loc="lower right")
+        plt.savefig('roc_curves_{}.png'.format(name))
 
+        print ''.join(cur_row)
+        writer.writerow(cur_row)
 
 def plot_learning_curve(estimator, title, X, y, ylim=None, cv=None,
                         n_jobs=1, train_sizes=np.linspace(.1, 1.0, 5)):
@@ -259,34 +270,53 @@ def retrieve_data():
 
 def time_data(df):
 
-    logging.info('Performing Data Visualization')
-
-    normal = df[df['state'] == 'Normal']
-    normal1 = normal[normal['id'] < 4506]
-    normal2 = normal1[normal1['id'] > 3937]
-    normal2['timestamp'] = pd.to_datetime(normal2['timestamp'])
-
-    #calm = df[df['state'] == 'Calm']
-    #stressed = df[df['state'] == 'Stressed']
-
+    logging.info('Plotting Time Series Data')
     #logging.info('The size of our dataset for the normal state {}'.format(normal.shape))
     #logging.info('The size of our dataset for the calm state {}'.format(calm.shape))
     #logging.info('The size of our dataset for the stressed state {}'.format(stressed.shape))
 
-    print normal1
-    ax = normal2.plot(ylim = (30,100), x='timestamp', y='hr',
-                                    color='DarkBlue', label='Normal')
-    #calm.plot(kind='scatter', xlim = (30,100), ylim = (0,15000),x='hr', y='gsr',
-    #                                color='DarkGreen', label='Calm', ax=ax)
-    #stressed.plot(kind='scatter', xlim = (30,100), ylim = (0,15000),x='hr', y='gsr',
-    #                                color='DarkRed', label='Stressed', ax=ax)
-    plt.savefig('normalhrs.png')
+    # Retrieve Subset of entries for each state
+    plot_time_data(df, 'Normal1', 3937, 4506)
+    plot_time_data(df, 'Normal2', 389, 1542)
+    plot_time_data(df, 'Normal3', 1543, 3678)
+    plot_time_data(df, 'Calm1', 63, 388)
+    plot_time_data(df, 'Calm2', 3679, 3936)
+    plot_time_data(df, 'Stressed1', 4907, 4995)
+    plot_time_data(df, 'Stressed2', 5256, 5277)
 
-    fig2 = plt.figure()
-    ax1 = normal2.plot(x='timestamp', y='temp',
-                                    color='DarkRed', label='Normal')
-    plt.savefig('normaltemp.png')
+def plot_time_data(current, state, start, end):
 
+    current1 = current[current['id'] < end]
+    current2 = current1[current1['id'] > start]
+    current2['timestamp'] = pd.to_datetime(current2['timestamp'])
+
+    # Heart Rate Data
+    plt.figure()
+    current2.plot(x='timestamp', y='hr',
+                        color='DarkRed', label='Heart Rate')
+    plt.savefig('heart_rate_{}.png'.format(state))
+
+    # GSR Data
+    plt.figure()
+    current2.plot(x='timestamp', y='gsr',
+                        color='Blue', label='GSR')
+    plt.savefig('GSR_{}.png'.format(state))
+
+    # Skin Temperature Data
+    plt.figure()
+    current2.plot(x='timestamp', y='temp',
+                        color='Orange', label='Skin Temperature')
+    plt.savefig('skin_temp_{}.png'.format(state))
+
+    #Acceleration Data
+    plt.figure()
+    ax = current2.plot(x='timestamp', y='accx',
+                                    color='DarkBlue', label='accx')
+    current2.plot(x='timestamp', y='accy',
+                                    color='DarkGreen', label='accy', ax=ax)
+    current2.plot(x='timestamp', y='accz',
+                                    color='DarkRed', label='accz', ax=ax)
+    plt.savefig('acceleration_{}.png'.format(state))
 
 def process_data(userid):
     """ Method to process data using ML algorithms from the Scikit-Learn Python
@@ -304,7 +334,8 @@ def process_data(userid):
 
     # Retrive Data from db & Visualize
     df = retrieve_data()
-    data_visualize(df)
+    #time_data(df)
+    #data_visualize(df)
 
     # State of 'None' is our unlabeled data set, so exclude
     df = df[df['state'] != 'None']
@@ -315,6 +346,7 @@ def process_data(userid):
     df['state'] = le.transform(df['state'])
 
     # Setting the dimensionality of our data set
+    #X_raw = df[['hr','gsr']].values
     X_raw = df[['hr','gsr','temp','accx','accy','accz']].values
     T_raw = df[['state']].values
     T_raw = np.ravel(T_raw)

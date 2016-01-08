@@ -1,0 +1,9 @@
+Nearest Neighbors,0.128236,0.98,0.96,1.00
+Linear SVM,0.9177,0.95,0.43,0.98
+RBF SVM,38.939867,0.99,0.98,1.00
+Decision Tree,0.104988,0.98,0.95,0.95
+Random Forest,0.40829,1.00,0.98,1.00
+AdaBoost,2.660969,0.99,0.98,1.00
+Naive Bayes,0.028848,0.96,0.80,1.00
+Linear Discriminant Analysis,0.045873,0.92,0.72,0.98
+Quadratic Discriminant Analysis,0.036704,0.97,0.85,1.00
