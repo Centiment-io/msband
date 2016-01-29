@@ -1,8 +1,12 @@
-# msband
+# Evaluation of Classification Performance of User State-Detection on the Microsoft Band 2 Using Heart Rate, Galvanic Skin Response, Skin Temperature and Accelerometer Data
 
-Evaluation of Classification Performance of User State-Detection on the Microsoft Band 2 Using Heart Rate, Galvanic Skin Response, Skin Temperature and Accelerometer Data
+Report Introduction:
+> The negative impacts of stress, which include an increased risk of heart disease and weakened immune system [1], come at a significant cost to physical health. The ability to be proactive in addressing these concerns is rooted in the detection and quantification of stress in our daily lives. Prior research has been conducted with respect to developing an effective non-invasive acute stress-detection system using physiological signals [2] [3] [4]. Research has shown that physiological signals such as heart rate (HR) and galvanic skin response (GSR) are the leading indicators for stress-detection [2] [3] [4]. Skin temperature and accelerometer data [5] [6] have also shown to be alternative indicators.
 
+> Affektive, a team of University of Toronto students, has developed a prototype for a wearable wristband to detect emotional state using HR and GSR. They were able to attain a mean classification accuracy of 84.14% using a Support Vector Machine (SVM) with a Radial Basis Function (RBF) kernel under controlled conditions outlined in their design document. One limitation discussed to potentially improve stress-detection performance was incorporating additional physiological signals to improve the
+dimensionality of the input for the machine learning algorithm.
 
-Excerpt..
-The negative impacts of stress, which include an increased risk of heart disease and weakened immune system [1], come at a significant cost to physical health. The ability to be proactive in addressing these concerns is rooted in the detection and quantification of stress in our daily lives. Prior research has been conducted with respect to developing an effective non-invasive acute stress-detection system using physiological signals [2] [3] [4]. Research has shown that physiological signals such as heart rate (HR) and galvanic skin response (GSR) are the leading indicators for stress-detection [2] [3] [4]. Skin temperature and accelerometer data [5] [6] have also shown to be alternative indicators.
+> The scope of this document is to assess the validity of the following limitation/assertion: increased input dimensionality (beyond HR and GSR) by the introduction of meaningful attributes, such as additional physiological signals, can improve stress-detection performance. Heart rate (HR), galvanic skin response (GSR), skin temperature (ST) and tri-axial accelerometer sensors on the Microsoft Band 2 will be the relevant sensors used in our analysis.
 
+> We will assess the validity of the limitation by first establishing a baseline performance for stress-detection by using only HR and GSR as inputs and reproduce comparable results to the AffektiveBand. Next, we attempt to improve upon the baseline performance by introducing additional attributes and effectively increasing the dimensionality of the input. Similarly to the AffektiveBand, we will assess our performance across various machine learning algorithms available in the scikit-learn
+library in Python.
